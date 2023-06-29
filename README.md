@@ -1,3 +1,6 @@
+# Why in Python
+Because it is helping me learn! No other reason as this will end up slower. Also, why not... 
+
 # What is this?
 
 Hakscale allows you to scale out shell commands over multiple systems with multiple threads on each system. The key concept is that a master server will _push_ commands to the queue, then multiple worker servers _pop_ commands from the queue and execute them. The output from those commands will then be sent back to the master server.
