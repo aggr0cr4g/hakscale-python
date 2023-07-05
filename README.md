@@ -1,9 +1,7 @@
-<<<<<<< Updated upstream
 # Why in Python
 Because it is helping me learn! No other reason as this will end up slower. Also, why not... 
 
-=======
-<<<<<<< Updated upstream
+
 =======
 # Why in Python
 Because it is helping me learn! No other reason as this will end up slower. Also, why not... 
@@ -19,8 +17,6 @@ Functionally the same usage however all within this same script. with the exampl
 python3 hakscale-python.py push -p "host:./hosts.txt" -c "ping _host_" -t 20
 ```
 
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 # What is this?
 
 Hakscale allows you to scale out shell commands over multiple systems with multiple threads on each system. The key concept is that a master server will _push_ commands to the queue, then multiple worker servers _pop_ commands from the queue and execute them. The output from those commands will then be sent back to the master server.
