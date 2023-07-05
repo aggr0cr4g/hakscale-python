@@ -1,5 +1,5 @@
 # Why in Python
-Because it is helping me learn! No other reason as this will end up slower. Also, why not... 
+Because it is helping me learn! No other reason as this will likely end up slower. Also, why not... 
 
 
 =======

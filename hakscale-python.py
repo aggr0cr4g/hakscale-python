@@ -10,6 +10,7 @@ import subprocess
 import time
 import uuid
 
+
 # Configuration class to hold Redis configuration
 class Config:
     def __init__(self, host, port, password):
@@ -30,7 +31,7 @@ def read_lines(filename):
 def check_if_all(array, comparator):
     return all(x == comparator for x in array)
 
-def loop_through(file_slices, placeholders, command, lengths, original_lengths, test, wg, queue_id, timeout, queue):
+def loop_through(file_slices, placeholders, command, lengths, original_lengths, test, queue_id, timeout, queue):
     # Get the total number of combinations
     total_combinations = 1
     for length in original_lengths:
@@ -52,8 +53,7 @@ def loop_through(file_slices, placeholders, command, lengths, original_lengths, 
             print()
         else:
             redis_client.lpush(queue, f"{queue_id}:::_:::{timeout}:::_:::{line}")
-            print(f"{queue_id}:::_:::{timeout}:::_:::{line}")
-            wg.add(1)
+            print(f"Pushed: {queue_id}:::_:::{timeout}:::_:::{line}")
 
 def print_results(queue_id, wg, verbose):
     while True:
@@ -84,15 +84,10 @@ def push_it(command, queue, parameters_string, test, timeout, verbose):
     lengths = [len(file_slice) for file_slice in file_slices]
     original_lengths = lengths.copy()
 
-    wg = threading.Semaphore()
-
     queue_id = str(uuid.uuid4())
 
-    threading.Thread(target=print_results, args=(queue_id, wg, verbose)).start()
+    loop_through(file_slices, placeholders, command, lengths, original_lengths, test, queue_id, timeout, queue)
 
-    loop_through(file_slices, placeholders, command, lengths, original_lengths, test, wg, queue_id, timeout, queue)
-
-    wg.acquire()
 
 def write_to_queue_and_print(command, queue, output):
     print(f"Output for command: {command}")
@@ -125,7 +120,7 @@ def do_work(wg, queue, verbose):
             time.sleep(1)
         else:
             shell_exec(result.decode(), verbose)
-    wg.release()
+            wg.release()
 
 def pop_it(threads, queue, verbose):
     wg = threading.Semaphore(0)
