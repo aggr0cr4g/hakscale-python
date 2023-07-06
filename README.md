@@ -1,29 +1,61 @@
-# Why in Python
-Because it is helping me learn! No other reason as this will likely end up slower. Also, why not... 
+# Hakscale Python
 
+Hakscale Python is a simple script that demonstrates the use of Python for queue-based task execution and result retrieval. It is designed to help me understand how to use Python for task distribution among various systems and how to push and retrieve results from a queue.
 
-=======
-# Why in Python
-Because it is helping me learn! No other reason as this will end up slower. Also, why not... 
+## Why Python?
 
-=======
+This project is developed in Python primarily as a learning exercise. While Python might not be the fastest language for this kind of task, it is an excellent language for learning and experimentation. Plus, why not?
 
-# Why in Python
-Because it is helping me learn! No other reason as this will end up slower. Also, why not... 
+## Getting Started
 
-# Python Installation
-```
+### Prerequisites
+
+- Python 3
+- Redis server
+
+### Installation
+
+To install the required Python libraries, run the following command:
+
+```sh
 python3 -m pip install -r requirements.txt
 ```
+# Usage
+Hakscale Python script can be used to push commands to a queue and execute them in a First-In-First-Out (FIFO) manner across distributed workers. The results are then pushed back to the queue, which can be retrieved by the client.
 
-# Python usage
-Functionally the same usage however all within this same script. with the example below
+### Example
+- Start monitoring the test queue with the following command:
 ```
-python3 hakscale-python.py push -p "host:./hosts.txt" -c "ping _host_" -t 20
+python3 hakscale-python.py pop -q test -t 1
 ```
+This command polls the queue every second for a task to execute and pushes the output to the queue by the ID using 1 thread.
+
+- With a `hosts.txt`, or whatever file, you can run the following command:
+```
+python3 hakscale-python.py push -p "host:./hosts.txt" -c "ping _host_ -c 2" -t 20 -q test
+```
+This command pushes individual variations to the queue with the same ID.
+![Push](img/image-1.jpg "Pushing")
+On the workers, you can see the tasks distributed in a FIFO order. These will be pushed in sequence to the queue, by ID, to allow the client to get results seen above.
+![Pop](img/image-2.jpg "Pop")
+The following image shows what the queue looks like when the client pushes a command and before the workers pop the command off for execution.
+![Queue](img/image-3.jpg "Queue")
+This image shows how the worker pushes the results to the queue for the client to pop off and return back to the terminal stdout. Notice the ID is the same between the photos. The difference in the number of items on the queues is because some of the commands were already popped off the queue before taking the screenshot.
+![Queue-2](img/image-4.jpg "Queue-2")
+Once both the client and the worker have completed processing results or executing tasks, the queue is empty.
+
+# Simply Put
+Hakscale Python is a simple yet powerful example of how Python can be used for distributed task execution using a queue. It's an excellent tool for learning and understanding the basics of task queues and distributed systems.
+<br><br><br>
 
 
-=======
+---
+
+Original Readme below
+
+---
+<br><br>
+
 # What is this?
 
 Hakscale allows you to scale out shell commands over multiple systems with multiple threads on each system. The key concept is that a master server will _push_ commands to the queue, then multiple worker servers _pop_ commands from the queue and execute them. The output from those commands will then be sent back to the master server.
