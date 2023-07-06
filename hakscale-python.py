@@ -55,8 +55,9 @@ def loop_through(file_slices, placeholders, command, lengths, original_lengths, 
             redis_client.lpush(queue, f"{queue_id}:::_:::{timeout}:::_:::{line}")
             print(f"Pushed: {queue_id}:::_:::{timeout}:::_:::{line}")
 
-def print_results(queue_id, verbose):
-    while True:
+def print_results(queue_id, verbose, total_combinations):
+    results_received = 0
+    while results_received < total_combinations:
         result = redis_client.rpop(queue_id)
         if result is None:
             if verbose:
@@ -64,6 +65,7 @@ def print_results(queue_id, verbose):
             time.sleep(1)
         else:
             print(result.decode())
+            results_received += 1
 
 def push_it(command, queue, parameters_string, test, timeout, verbose):
     split = []
@@ -83,13 +85,18 @@ def push_it(command, queue, parameters_string, test, timeout, verbose):
 
     queue_id = str(uuid.uuid4())
 
+    # Get the total number of combinations
+    total_combinations = 1
+    for length in original_lengths:
+        total_combinations *= length
+    #print(total_combinations)
     loop_through(file_slices, placeholders, command, lengths, original_lengths, test, queue_id, timeout, queue)
-    print_results(queue_id, verbose)
+    print_results(queue_id, verbose, total_combinations)
 
 
 def write_to_queue_and_print(command, queue, output):
     print(f"Output for command: {command}")
-    print(output.decode())
+    #print(output.decode())
     redis_client.lpush(queue, output)
 
 def shell_exec(command, verbose):
