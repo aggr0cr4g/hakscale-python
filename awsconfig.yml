@@ -1,0 +1,5 @@
+sqs:
+  queue_url: YOUR_AWS_SQS_QUEUE_URL
+aws:
+  access_key_id: YOUR_AWS_ACCESS_KEY_ID
+  secret_access_key: YOUR_AWS_SECRET_ACCESS_KEY

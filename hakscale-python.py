@@ -9,6 +9,12 @@ import threading
 import subprocess
 import time
 import uuid
+import boto3
+
+
+# Global variables
+config = None
+queue_client = None
 
 
 # Configuration class to hold Redis configuration
@@ -31,7 +37,7 @@ def read_lines(filename):
 def check_if_all(array, comparator):
     return all(x == comparator for x in array)
 
-def loop_through(file_slices, placeholders, command, lengths, original_lengths, test, queue_id, timeout, queue):
+def loop_through(file_slices, placeholders, command, lengths, original_lengths, test, queue_id, timeout, queue, sqs, queue_server):
     # Get the total number of combinations
     total_combinations = 1
     for length in original_lengths:
@@ -50,10 +56,28 @@ def loop_through(file_slices, placeholders, command, lengths, original_lengths, 
         # Print or push the command
         if test:
             print(f"{queue_id}:::_:::{timeout}:::_:::{line}")
-            print()
+            #print()
         else:
-            redis_client.lpush(queue, f"{queue_id}:::_:::{timeout}:::_:::{line}")
-            print(f"Pushed: {queue_id}:::_:::{timeout}:::_:::{line}")
+            # Inside the loop, conditionally push to AWS SQS or Redis
+            if queue_server == 'aws-sqs':
+                # Code to send message to AWS SQS
+                response = sqs.send_message(
+                    QueueUrl=queue,
+                    DelaySeconds=10,
+                    MessageAttributes={
+                        'Command': {
+                            'DataType': 'String',
+                            'StringValue': line
+                        }
+                    },
+                    MessageBody=f"{queue_id}:::_:::{timeout}:::_:::{line}"
+                )
+                print(f"Pushed to AWS SQS: {queue_id}:::_:::{timeout}:::_:::{line}")
+            else:
+                # Code to push to Redis
+                redis_client.lpush(queue, f"{queue_id}:::_:::{timeout}:::_:::{line}")
+                print(f"Pushed to Redis: {queue_id}:::_:::{timeout}:::_:::{line}")
+
 
 def print_results(queue_id, verbose, total_combinations):
     results_received = 0
@@ -67,7 +91,7 @@ def print_results(queue_id, verbose, total_combinations):
             print(result.decode())
             results_received += 1
 
-def push_it(command, queue, parameters_string, test, timeout, verbose):
+def push_it(command, queue, parameters_string, test, timeout, verbose, queue_server):
     split = []
     filenames = []
     placeholders = []
@@ -89,9 +113,30 @@ def push_it(command, queue, parameters_string, test, timeout, verbose):
     total_combinations = 1
     for length in original_lengths:
         total_combinations *= length
-    #print(total_combinations)
-    loop_through(file_slices, placeholders, command, lengths, original_lengths, test, queue_id, timeout, queue)
-    print_results(queue_id, verbose, total_combinations)
+
+    # If queue_server is aws-sqs, use AWS SQS
+    if queue_server == 'aws-sqs':
+        # Load AWS SQS config
+        config_path = os.path.join(os.environ['PWD'], "./awsconfig.yml")
+        try:
+            with open(config_path, 'r') as f:
+                aws_config = yaml.safe_load(f)
+        except Exception as e:
+            print(f"Error opening AWS config file: {e}")
+            return
+
+        # Create SQS client
+        sqs = boto3.client('sqs')
+        queue_url = aws_config['sqs']['queue_url']
+
+        # Loop through and send messages to AWS SQS
+        loop_through(file_slices, placeholders, command, lengths, original_lengths, test, queue_id, timeout, queue_url, sqs, queue_server)
+
+    # Else, use Redis
+    else:
+        loop_through(file_slices, placeholders, command, lengths, original_lengths, test, queue_id, timeout, queue, None, queue_server)
+        if not test:
+            print_results(queue_id, verbose, total_combinations)
 
 
 def write_to_queue_and_print(command, queue, output):
@@ -142,37 +187,13 @@ def main():
         print("Error: Subcommand missing or incorrect.")
         return
 
-    # Load config file
-    config_path = os.path.join(os.environ['PWD'], "./redisconfig.yml")
-    try:
-        with open(config_path, 'r') as f:
-            global config
-            config = yaml.safe_load(f)
-    except Exception as e:
-        print(f"Error opening config file: {e}")
-        return
-
-    # Connect to Redis server
-    global redis_client
-    redis_client = redis.Redis(
-        host=config['redis']['host'],
-        port=config['redis']['port'],
-        password=config['redis']['password'],
-        ssl=False,
-        ssl_cert_reqs=ssl.CERT_NONE
-    )
-
-    # Check Redis server connection
-    try:
-        redis_client.ping()
-        print("Ping Worked")
-    except redis.ConnectionError as e:
-        print(f"Unable to connect to specified Redis server: {e}")
-        sys.exit(1)
-
     # Argument parsing
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='subcommand')
+
+    # Common argument for specifying the queue server
+    parser.add_argument('--queue-server', type=str, default='redis', choices=['redis', 'aws-sqs'], help='Specify the queue server to use (default: redis)')
+
 
     # Push subcommand
     parser_push = subparsers.add_parser('push')
@@ -192,12 +213,46 @@ def main():
     # Parsearguments
     args = parser.parse_args()
 
+    # Determine which queue server to use
+    if args.queue_server == 'redis':
+        # Load config file for Redis
+        config_path = os.path.join(os.environ['PWD'], "./redisconfig.yml")
+        try:
+            with open(config_path, 'r') as f:
+                global config
+                config = yaml.safe_load(f)
+        except Exception as e:
+            print(f"Error opening config file: {e}")
+            return
+
+        # Connect to Redis server
+        global queue_client
+        queue_client = redis.Redis(
+            host=config['redis']['host'],
+            port=config['redis']['port'],
+            password=config['redis']['password'],
+            ssl=False,
+            ssl_cert_reqs=ssl.CERT_NONE
+        )
+        # Check Redis server connection
+        try:
+            queue_client.ping()
+            print("Connected to Redis server")
+        except redis.ConnectionError as e:
+            print(f"Unable to connect to specified Redis server: {e}")
+            sys.exit(1)
+    elif args.queue_server == 'aws-sqs':
+        # Connect to AWS SQS here
+        # Check Redis server connection
+        print("Using AWS SQS")
+        # implement SQS logic in punctions.
+
     # Handle subcommands
     if args.subcommand == 'push':
         if args.timeout == 0:
             logging.error("You must specify a timeout to avoid leaving your workers endlessly working. Hint: -t <seconds>")
             sys.exit(1)
-        push_it(args.command, args.queue, args.parameters, args.test, args.timeout, args.verbose)
+        push_it(args.command, args.queue, args.parameters, args.test, args.timeout, args.verbose, args.queue_server)
 
     elif args.subcommand == 'pop':
         pop_it(args.threads, args.queue, args.verbose)

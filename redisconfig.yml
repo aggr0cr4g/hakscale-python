@@ -1,4 +1,4 @@
 redis:
-  host: 192.168.2.66
+  host: IP_ADDRESS
   port: 6379
-  password: GetSchwifty
+  password: QUEUE_PASS
